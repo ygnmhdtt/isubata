@@ -744,6 +744,12 @@ func postProfile(c echo.Context) error {
 
 func getIcon(c echo.Context) error {
 	name := c.Param("file_name")
+
+	c.Response().Header().Set("ETag", name[0:len(name)-4])
+	c.Response().Header().Set("Last-Modified", "Sut, 17 Aug 2018 22:33:02 GMT")
+	if c.Request().Header.Get("If-Modified-Since") != "" || c.Request().Header.Get("If-None-Match") != "" {
+		return c.NoContent(304)
+	}
 	// var data []byte
 	// rows, err := db.Query("SELECT name, data FROM image")
 	// c.Param("file_name")).Scan(&name, &data)
