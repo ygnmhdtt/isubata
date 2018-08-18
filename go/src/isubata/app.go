@@ -105,13 +105,19 @@ func getUser(userID int64) (*User, error) {
 }
 
 func addMessage(channelID, userID int64, content string) (int64, error) {
-	res, err := db.Exec(
+	_, err := db.Exec(
 		"INSERT INTO message (channel_id, user_id, content, created_at) VALUES (?, ?, ?, NOW())",
 		channelID, userID, content)
 	if err != nil {
 		return 0, err
 	}
-	return res.LastInsertId()
+
+	_, err = db.Exec("UPDATE channel set message_count = message_count + 1 where id = ?", channelID)
+	if err != nil {
+		return 0, err
+	}
+	return 0, nil
+	// return res.LastInsertId()
 }
 
 type Message struct {
@@ -208,6 +214,7 @@ func getInitialize(c echo.Context) error {
 	db.MustExec("DELETE FROM channel WHERE id > 10")
 	db.MustExec("DELETE FROM message WHERE id > 10000")
 	db.MustExec("DELETE FROM haveread")
+	db.MustExec("UPDATE channel set message_count = (select count(*) from message where channel_id = channel.id)")
 	return c.String(204, "")
 }
 
@@ -223,11 +230,12 @@ func getIndex(c echo.Context) error {
 }
 
 type ChannelInfo struct {
-	ID          int64     `db:"id"`
-	Name        string    `db:"name"`
-	Description string    `db:"description"`
-	UpdatedAt   time.Time `db:"updated_at"`
-	CreatedAt   time.Time `db:"created_at"`
+	ID           int64     `db:"id"`
+	Name         string    `db:"name"`
+	Description  string    `db:"description"`
+	MessageCount int       `db:"message_count"`
+	UpdatedAt    time.Time `db:"updated_at"`
+	CreatedAt    time.Time `db:"created_at"`
 }
 
 func getChannel(c echo.Context) error {
