@@ -47,25 +47,24 @@ func init() {
 	crand.Read(seedBuf)
 	rand.Seed(int64(binary.LittleEndian.Uint64(seedBuf)))
 
-	db_host := os.Getenv("ISUBATA_DB_HOST")
-	if db_host == "" {
-		db_host = "127.0.0.1"
-	}
-	db_port := os.Getenv("ISUBATA_DB_PORT")
-	if db_port == "" {
-		db_port = "3306"
-	}
-	db_user := os.Getenv("ISUBATA_DB_USER")
-	if db_user == "" {
-		db_user = "root"
-	}
-	db_password := os.Getenv("ISUBATA_DB_PASSWORD")
-	if db_password != "" {
-		db_password = ":" + db_password
-	}
+	// db_host := os.Getenv("ISUBATA_DB_HOST")
+	// if db_host == "" {
+	// 	db_host = "127.0.0.1"
+	// }
+	// db_port := os.Getenv("ISUBATA_DB_PORT")
+	// if db_port == "" {
+	// 	db_port = "3306"
+	// }
+	// db_user := os.Getenv("ISUBATA_DB_USER")
+	// if db_user == "" {
+	// 	db_user = "root"
+	// }
+	// db_password := os.Getenv("ISUBATA_DB_PASSWORD")
+	// if db_password != "" {
+	// 	db_password = ":" + db_password
+	// }
 
-	dsn := fmt.Sprintf("%s%s@tcp(%s:%s)/isubata?parseTime=true&loc=Local&charset=utf8mb4",
-		db_user, db_password, db_host, db_port)
+	dsn := "isucon:isucon@tcp(localhost:3306)/isubata?parseTime=true&loc=Local&charset=utf8mb4"
 
 	log.Printf("Connecting to db: %q", dsn)
 	db, _ = sqlx.Connect("mysql", dsn)
@@ -662,10 +661,18 @@ func postProfile(c echo.Context) error {
 	}
 
 	if avatarName != "" && len(avatarData) > 0 {
-		_, err := db.Exec("INSERT INTO image (name, data) VALUES (?, ?)", avatarName, avatarData)
+		f, err := os.Create(fmt.Sprintf("/tmp/images/%s", avatarName))
 		if err != nil {
 			return err
 		}
+		defer f.Close()
+
+		f.Write(avatarData)
+
+		// _, err := db.Exec("INSERT INTO image (name, data) VALUES (?, ?)", avatarName, avatarData)
+		// if err != nil {
+		// 	return err
+		// }
 		_, err = db.Exec("UPDATE user SET avatar_icon = ? WHERE id = ?", avatarName, self.ID)
 		if err != nil {
 			return err
@@ -683,16 +690,16 @@ func postProfile(c echo.Context) error {
 }
 
 func getIcon(c echo.Context) error {
-	var name string
-	var data []byte
-	err := db.QueryRow("SELECT name, data FROM image WHERE name = ?",
-		c.Param("file_name")).Scan(&name, &data)
-	if err == sql.ErrNoRows {
-		return echo.ErrNotFound
-	}
-	if err != nil {
-		return err
-	}
+	name := c.Param("file_name")
+	// var data []byte
+	// err := db.QueryRow("SELECT name, data FROM image WHERE name = ?",
+	// 	c.Param("file_name")).Scan(&name, &data)
+	// if err == sql.ErrNoRows {
+	// 	return echo.ErrNotFound
+	// }
+	// if err != nil {
+	// 	return err
+	// }
 
 	mime := ""
 	switch true {
@@ -705,6 +712,7 @@ func getIcon(c echo.Context) error {
 	default:
 		return echo.ErrNotFound
 	}
+	data, _ := ioutil.ReadFile("/tmp/images/" + name)
 	return c.Blob(http.StatusOK, mime, data)
 }
 
