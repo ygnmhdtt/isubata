@@ -47,27 +47,26 @@ func init() {
 	crand.Read(seedBuf)
 	rand.Seed(int64(binary.LittleEndian.Uint64(seedBuf)))
 
-	db_host := os.Getenv("ISUBATA_DB_HOST")
-	if db_host == "" {
-		db_host = "127.0.0.1"
-	}
-	db_port := os.Getenv("ISUBATA_DB_PORT")
-	if db_port == "" {
-		db_port = "3306"
-	}
-	db_user := os.Getenv("ISUBATA_DB_USER")
-	if db_user == "" {
-		db_user = "root"
-	}
-	db_password := os.Getenv("ISUBATA_DB_PASSWORD")
-	if db_password != "" {
-		db_password = ":" + db_password
-	}
+	// 	db_host := os.Getenv("ISUBATA_DB_HOST")
+	// 	if db_host == "" {
+	// 		db_host = "127.0.0.1"
+	// 	}
+	// 	db_port := os.Getenv("ISUBATA_DB_PORT")
+	// 	if db_port == "" {
+	// 		db_port = "3306"
+	// 	}
+	// 	db_user := os.Getenv("ISUBATA_DB_USER")
+	// 	if db_user == "" {
+	// 		db_user = "root"
+	// 	}
+	// 	db_password := os.Getenv("ISUBATA_DB_PASSWORD")
+	// 	if db_password != "" {
+	// 		db_password = ":" + db_password
+	// 	}
 
-	dsn := fmt.Sprintf("%s%s@tcp(%s:%s)/isubata?parseTime=true&loc=Local&charset=utf8mb4",
-		db_user, db_password, db_host, db_port)
+	dsn := "isucon:isucon@tcp(127.0.0.1:3306)/isubata?parseTime=true&loc=Local&charset=utf8mb4"
 
-	log.Printf("Connecting to db: %q", dsn)
+	// log.Printf("Connecting to db: %q", dsn)
 	db, _ = sqlx.Connect("mysql", dsn)
 	for {
 		err := db.Ping()
@@ -80,7 +79,7 @@ func init() {
 
 	db.SetMaxOpenConns(20)
 	db.SetConnMaxLifetime(5 * time.Minute)
-	log.Printf("Succeeded to connect db.")
+	// log.Printf("Succeeded to connect db.")
 }
 
 type User struct {
@@ -374,9 +373,22 @@ func jsonifyMessage(m Message) (map[string]interface{}, error) {
 	return r, nil
 }
 
-func getUsers() ([]User, error) {
+func getUsers(userIDs []int) ([]User, error) {
+	if len(userIDs) == 0 {
+		u := []User{}
+		err := db.Select(&u, "SELECT id, name, display_name, avatar_icon FROM user")
+		if err != nil {
+			return nil, err
+		}
+		return u, nil
+	}
 	u := []User{}
-	err := db.Select(&u, "SELECT id, name, display_name, avatar_icon FROM user")
+	query, args, err := sqlx.In("SELECT id, name, display_name, avatar_icon FROM user where id in (?)", userIDs)
+	if err != nil {
+		return nil, err
+	}
+	query = db.Rebind(query)
+	err = db.Select(&u, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -414,8 +426,9 @@ func getMessage(c echo.Context) error {
 		return err
 	}
 
+	userIDs := messageUserIDs(messages)
 	response := make([]map[string]interface{}, 0)
-	users, err := getUsers()
+	users, err := getUsers(userIDs)
 	if err != nil {
 		return err
 	}
@@ -516,6 +529,14 @@ func fetchUnread(c echo.Context) error {
 	return c.JSON(http.StatusOK, resp)
 }
 
+func messageUserIDs(messages []Message) []int {
+	var arr []int
+	for _, msg := range messages {
+		arr = append(arr, int(msg.UserID))
+	}
+	return arr
+}
+
 func getHistory(c echo.Context) error {
 	chID, err := strconv.ParseInt(c.Param("channel_id"), 10, 64)
 	if err != nil || chID <= 0 {
@@ -560,8 +581,10 @@ func getHistory(c echo.Context) error {
 		return err
 	}
 
+	userIDs := messageUserIDs(messages)
+
 	mjson := make([]map[string]interface{}, 0)
-	users, err := getUsers()
+	users, err := getUsers(userIDs)
 	if err != nil {
 		return err
 	}
@@ -800,9 +823,9 @@ func main() {
 		templates: template.Must(template.New("").Funcs(funcs).ParseGlob("views/*.html")),
 	}
 	e.Use(session.Middleware(sessions.NewCookieStore([]byte("secretonymoris"))))
-	e.Use(middleware.LoggerWithConfig(middleware.LoggerConfig{
-		Format: "request:\"${method} ${uri}\" status:${status} latency:${latency} (${latency_human}) bytes:${bytes_out}\n",
-	}))
+	// e.Use(middleware.LoggerWithConfig(middleware.LoggerConfig{
+	// 	Format: "request:\"${method} ${uri}\" status:${status} latency:${latency} (${latency_human}) bytes:${bytes_out}\n",
+	// }))
 	e.Use(middleware.Static("../public"))
 
 	e.GET("/initialize", getInitialize)
