@@ -743,7 +743,7 @@ func postProfile(c echo.Context) error {
 		// if err != nil {
 		// 	return err
 		// }
-		f, err := os.Create("/tmp/images/" + avatarName)
+		f, err := os.Create("/home/isucon/images/" + avatarName)
 		defer f.Close()
 		if err != nil {
 			return err
@@ -794,7 +794,7 @@ func getIcon(c echo.Context) error {
 	default:
 		return echo.ErrNotFound
 	}
-	data, err := ioutil.ReadFile("/tmp/images/" + name)
+	data, err := ioutil.ReadFile("/home/isucon/images/" + name)
 	if err != nil {
 		return err
 	}

@@ -28,7 +28,7 @@ func dump() {
 		var name string
 		var data []byte
 		err = rows.Scan(&name, &data)
-		file, err := os.Create("/tmp/images/" + name)
+		file, err := os.Create("/home/isucon/images/" + name)
 		if err != nil {
 			panic(err)
 		}
